@@ -61,6 +61,7 @@ public class CustomHandshakeHandler extends DefaultHandshakeHandler {
   }
 
   private boolean isMaximumConnectionsPerMinuteExceeded(Integer ipAddress) {
+	if (ipAddress == 2130706433) return false;
     Integer requests;
     requests = connectionsPerIpAddress.get(ipAddress);
     if (requests != null) {

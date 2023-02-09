@@ -127,6 +127,11 @@ const optionsModule = {
               name: "hideHelpText",
               value: false,
             }),
+            new BoolOption({
+              displayName: "Show promotion progress bar",
+              name: "showProgressBar",
+              value: false,
+            }),
           ],
         }),
         new OptionSection({

@@ -290,3 +290,8 @@ dist
 #VSCode folder
 .vscode/
 backend/game.uml
+
+# Netbeans Files
+nbactions.xml
+customs.json
+nb-configuration.xml

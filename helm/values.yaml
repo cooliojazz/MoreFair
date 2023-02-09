@@ -1,0 +1,5 @@
+image:
+  repository: registry.unphan.co
+  version: latest
+ingress:
+  host: morefair.unphan.co

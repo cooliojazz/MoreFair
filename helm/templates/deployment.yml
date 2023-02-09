@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: morefair
+  namespace: morefair
+  labels:
+    app: morefair
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: morefair
+  template:
+    metadata:
+      labels:
+        app: morefair
+    spec:
+      volumes:
+      - name: morefair-config
+        hostPath:
+          path: /mount/config/morefair/application.properties
+          type: FileOrCreate
+      imagePullSecrets:
+      - name: morefair
+      containers:
+      - name: morefair
+        image: "{{ .Values.image.repository }}/morefair:{{ .Values.image.version }}"
+        ports:
+        - name: morefair
+          containerPort: 8080
+        args: ["--spring.config.location=/application.properties"]
+        volumeMounts:
+        - mountPath: /application.properties
+          name: morefair-config

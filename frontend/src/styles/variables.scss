@@ -63,6 +63,7 @@ $color-saltpan: #ebede9;
   --background-light-color: #{$color-black-pearl};
   --placeholder-color: #{$color-claret};
   --item-selected-color: #{$color-tangaroa};
+  --progress-color: var(--text-dark-highlight-color);
 
   // Text
   --text-font-size: 15px;
@@ -109,6 +110,7 @@ $color-saltpan: #ebede9;
   --background-light-color: #{$color-jet-stream};
   --placeholder-color: #{$color-claret};
   --item-selected-color: #{$color-submarine};
+  --progress-color: var(--text-dark-highlight-color);
 
   // Text
   --text-font-size: 15px;

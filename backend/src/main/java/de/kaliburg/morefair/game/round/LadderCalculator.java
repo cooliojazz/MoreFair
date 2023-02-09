@@ -7,6 +7,7 @@ import de.kaliburg.morefair.events.Event;
 import de.kaliburg.morefair.events.types.EventType;
 import de.kaliburg.morefair.game.chat.MessageService;
 import de.kaliburg.morefair.game.round.dto.HeartbeatDto;
+import de.kaliburg.morefair.utils.AutoCloseableSemaphore;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -54,92 +55,93 @@ public class LadderCalculator {
   public void update() {
     // Reset the Heartbeat
     didPressAssholeButton = false;
+//	try (AutoCloseableSemaphore ls = ladderService.getLadderSemaphore().safeAcquireGet(log)) {
     try {
       ladderService.getLadderSemaphore().acquire();
       try {
-        // Process and filter all events since the last Calculation Step
-        handlePlayerEvents();
+	  // Process and filter all events since the last Calculation Step
+	  handlePlayerEvents();
 
-        // Calculate Time passed
-        long currentNanos = System.nanoTime();
-        double deltaSec = Math.max((currentNanos - lastTimeMeasured) / NANOS_IN_SECONDS,
-            1.0d);
-        lastTimeMeasured = currentNanos;
+	  // Calculate Time passed
+	  long currentNanos = System.nanoTime();
+	  double deltaSec = Math.max((currentNanos - lastTimeMeasured) / NANOS_IN_SECONDS, 1);
+	  lastTimeMeasured = currentNanos;
 
-        // Otherwise, just send the default Heartbeat-Tick
-        heartbeat.setDelta(deltaSec);
-        wsUtils.convertAndSendToTopic(GameController.TOPIC_TICK_DESTINATION, heartbeat);
+	  // Otherwise, just send the default Heartbeat-Tick
+	  heartbeat.setDelta(deltaSec);
+	  wsUtils.convertAndSendToTopic(GameController.TOPIC_TICK_DESTINATION, heartbeat);
 
-        // Calculate Ladder yourself
-        Collection<LadderEntity> ladders = ladderService.getCurrentLadderMap().values();
+	  // Calculate Ladder yourself
+	  Collection<LadderEntity> ladders = ladderService.getCurrentLadderMap().values();
         List<CompletableFuture<Void>> futures = ladders.stream()
             .map(ladder -> CompletableFuture.runAsync(
                 () -> calculateLadder(ladder, deltaSec))).toList();
-        try {
-          CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).get();
-        } catch (ExecutionException | InterruptedException e) {
-          log.error(e.getMessage());
-          e.printStackTrace();
-        }
+	  try {
+		CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).get();
+	  } catch (ExecutionException | InterruptedException e) {
+		log.error(e.getMessage());
+		e.printStackTrace();
+	  }
       } finally {
         ladderService.getLadderSemaphore().release();
-      }
+	}
     } catch (InterruptedException e) {
       log.error(e.getMessage());
       e.printStackTrace();
-    }
+  }
   }
 
   private void handlePlayerEvents() {
+//	try (AutoCloseableSemaphore ls = ladderService.getLadderSemaphore().safeAcquireGet(log)) {
     try {
       ladderService.getEventSemaphore().acquire();
       try {
-        for (int i = 1; i <= ladderService.getCurrentLadderMap().size(); i++) {
-          // Handle the events since the last update
-          LadderEntity ladder = ladderService.getCurrentLadderMap().get(i);
-          List<Event> events = ladderService.getEventMap().get(ladder.getNumber());
-          List<Event> eventsToBeRemoved = new ArrayList<>();
-          for (int j = 0; j < events.size(); j++) {
-            Event e = events.get(j);
-            switch (e.getEventType()) {
-              case BUY_BIAS -> {
-                if (!ladderService.buyBias(e, ladder)) {
-                  eventsToBeRemoved.add(e);
-                }
-              }
-              case BUY_MULTI -> {
-                if (!ladderService.buyMulti(e, ladder)) {
-                  eventsToBeRemoved.add(e);
-                }
-              }
-              case PROMOTE -> {
-                if (!ladderService.promote(e, ladder)) {
-                  eventsToBeRemoved.add(e);
-                }
-              }
-              case THROW_VINEGAR -> {
-                if (!ladderService.throwVinegar(e, ladder)) {
-                  eventsToBeRemoved.add(e);
-                }
-              }
-              case BUY_AUTO_PROMOTE -> {
-                if (!ladderService.buyAutoPromote(e, ladder)) {
-                  eventsToBeRemoved.add(e);
-                }
-              }
-              default -> {
+	  for (int i = 1; i <= ladderService.getCurrentLadderMap().size(); i++) {
+		// Handle the events since the last update
+		LadderEntity ladder = ladderService.getCurrentLadderMap().get(i);
+		List<Event> events = ladderService.getEventMap().get(ladder.getNumber());
+		List<Event> eventsToBeRemoved = new ArrayList<>();
+		for (int j = 0; j < events.size(); j++) {
+		  Event e = events.get(j);
+		  switch (e.getEventType()) {
+			case BUY_BIAS -> {
+			  if (!ladderService.buyBias(e, ladder)) {
+				eventsToBeRemoved.add(e);
+			  }
+			}
+			case BUY_MULTI -> {
+			  if (!ladderService.buyMulti(e, ladder)) {
+				eventsToBeRemoved.add(e);
+			  }
+			}
+			case PROMOTE -> {
+			  if (!ladderService.promote(e, ladder)) {
+				eventsToBeRemoved.add(e);
+			  }
+			}
+			case THROW_VINEGAR -> {
+			  if (!ladderService.throwVinegar(e, ladder)) {
+				eventsToBeRemoved.add(e);
+			  }
+			}
+			case BUY_AUTO_PROMOTE -> {
+			  if (!ladderService.buyAutoPromote(e, ladder)) {
+				eventsToBeRemoved.add(e);
+			  }
+			}
+			default -> {
 
-              }
-            }
-          }
-          for (Event e : eventsToBeRemoved) {
-            events.remove(e);
-          }
-        }
-        ladderService.getEventMap().values().forEach(List::clear);
+			}
+		  }
+		}
+		for (Event e : eventsToBeRemoved) {
+		  events.remove(e);
+		}
+	  }
+	  ladderService.getEventMap().values().forEach(List::clear);
       } finally {
         ladderService.getEventSemaphore().release();
-      }
+	}
     } catch (Exception e) {
       log.error(e.getMessage());
       e.printStackTrace();

@@ -1,4 +1,8 @@
 <template>
+  <div v-show="showProgressBar" class="progress"
+    :style="{width: numberFormatter.format(yourRanker.points.mul(100)
+	.div(stats.pointsNeededForManualPromote).min(100)) + '%'}"
+  ></div>
   <div class="row py-1">
     <div class="col-6">
       <div class="container px-3">
@@ -207,6 +211,9 @@ const hideVinegarAndGrapes = computed(() =>
 const hideHelpText = computed(() =>
   store.getters["options/getOptionValue"]("hideHelpText")
 );
+const showProgressBar = computed(() =>
+  store.getters["options/getOptionValue"]("showProgressBar")
+);
 const biasCost = computed(() =>
   store.getters["ladder/getNextUpgradeCost"](yourRanker.value.bias)
 );
@@ -326,5 +333,12 @@ div .col-6 {
 
 .hide {
   display: none !important;
+}
+
+.progress {
+	background-color: var(--progress-color);
+	height: 20px;
+	margin-top: 5px;
+	margin-bottom: 5px;
 }
 </style>

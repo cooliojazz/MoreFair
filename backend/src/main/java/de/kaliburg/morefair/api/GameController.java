@@ -108,8 +108,9 @@ public class GameController {
       if (account == null || account.isBanned()) {
         return;
       }
-      Integer num = ladderService.findFirstActiveRankerOfAccountThisRound(account).getLadder()
-          .getNumber();
+      RankerEntity ranker = ladderService.findFirstActiveRankerOfAccountThisRound(account);
+	  if (ranker == null) return;
+      Integer num = ranker.getLadder().getNumber();
       log.info("[L{}] BIAS: {} (#{}) {}", num, account.getUsername(), account.getId(),
           wsMessage.getEvent());
       ModServerMessageData data = new ModServerMessageData(account.getId(),
@@ -180,8 +181,9 @@ public class GameController {
         return;
       }
       RoundEntity currentRound = roundService.getCurrentRound();
-      Integer num = ladderService.findFirstActiveRankerOfAccountThisRound(account).getLadder()
-          .getNumber();
+      RankerEntity ranker = ladderService.findFirstActiveRankerOfAccountThisRound(account);
+	  if (ranker == null) return;
+      Integer num = ranker.getLadder().getNumber();
       log.info("[L{}] PROMOTE: {} (#{}) {}", num, account.getUsername(), account.getId(),
           wsMessage.getEvent());
       ModServerMessageData data = new ModServerMessageData(account.getId(),
@@ -204,8 +206,9 @@ public class GameController {
         return;
       }
       RoundEntity currentRound = roundService.getCurrentRound();
-      Integer num = ladderService.findFirstActiveRankerOfAccountThisRound(account).getLadder()
-          .getNumber();
+      RankerEntity ranker = ladderService.findFirstActiveRankerOfAccountThisRound(account);
+	  if (ranker == null) return;
+      Integer num = ranker.getLadder().getNumber();
       log.info("[L{}] AUTOPROMOTE: {} (#{}) {}", num, account.getUsername(), account.getId(),
           wsMessage.getEvent());
       ModServerMessageData data = new ModServerMessageData(account.getId(),

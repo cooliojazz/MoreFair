@@ -83,9 +83,8 @@ public class RankerEntity {
   }
 
   public RankerEntity addPoints(BigInteger points, double secondsPassed) {
-    BigDecimal decPoints = new BigDecimal(points);
-    decPoints = decPoints.multiply(BigDecimal.valueOf(secondsPassed));
-    this.points = this.points.add(decPoints.toBigInteger());
+	this.points = this.points.add(new BigDecimal(points)
+	    .multiply(BigDecimal.valueOf(secondsPassed)).toBigInteger());
     return this;
   }
 

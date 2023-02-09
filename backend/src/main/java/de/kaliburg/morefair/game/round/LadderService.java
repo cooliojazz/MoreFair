@@ -16,6 +16,7 @@ import de.kaliburg.morefair.game.GameResetEvent;
 import de.kaliburg.morefair.game.UpgradeUtils;
 import de.kaliburg.morefair.game.chat.ChatService;
 import de.kaliburg.morefair.game.chat.MessageService;
+import de.kaliburg.morefair.utils.AutoCloseableSemaphore;
 import de.kaliburg.morefair.utils.FormattingUtils;
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -54,8 +55,10 @@ public class LadderService implements ApplicationListener<AccountServiceEvent> {
   private final RankerService rankerService;
   private final LadderRepository ladderRepository;
   @Getter(AccessLevel.PACKAGE)
+//  private final AutoCloseableSemaphore eventSemaphore = new AutoCloseableSemaphore(1);
   private final Semaphore eventSemaphore = new Semaphore(1);
   @Getter(AccessLevel.PACKAGE)
+//  private final AutoCloseableSemaphore ladderSemaphore = new AutoCloseableSemaphore(1);
   private final Semaphore ladderSemaphore = new Semaphore(1);
   private final LadderUtils ladderUtils;
   private final AccountService accountService;
@@ -90,6 +93,10 @@ public class LadderService implements ApplicationListener<AccountServiceEvent> {
     this.config = config;
     this.gson = gson;
   }
+  
+//  public AutoCloseableSemaphore getLadderSemaphore() {
+//	return ladderSemaphore;
+//  }
 
   @Transactional
   public void saveStateToDatabase(RoundEntity currentRound) {
@@ -296,22 +303,27 @@ public class LadderService implements ApplicationListener<AccountServiceEvent> {
    * @return The created Ranker, can be null if one of the acquires gets interrupted
    */
   RankerEntity createRanker(AccountEntity account) {
+//    try (AutoCloseableSemaphore ls = ladderSemaphore.safeAcquireGet(log)) {
+//      try (AutoCloseableSemaphore es = eventSemaphore.safeAcquireGet(log)) {
+//        return createRanker(account, 1);
+//      }
+//    }
     try {
       ladderSemaphore.acquire();
       try {
         eventSemaphore.acquire();
         try {
-          return createRanker(account, 1);
+        return createRanker(account, 1);
         } finally {
           eventSemaphore.release();
-        }
+      }
       } finally {
         ladderSemaphore.release();
-      }
+    }
     } catch (InterruptedException e) {
       log.error(e.getMessage());
       e.printStackTrace();
-    }
+  }
     return null;
   }
 
@@ -392,6 +404,7 @@ public class LadderService implements ApplicationListener<AccountServiceEvent> {
   boolean buyBias(Event event, LadderEntity ladder) {
     try {
       RankerEntity ranker = findActiveRankerOfAccountOnLadder(event.getAccountId(), ladder);
+	  if (ranker == null) return false;
       BigInteger cost = upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getBias(), ladder.getTypes());
       if (ranker.getPoints().compareTo(cost) >= 0) {
         ranker.setPoints(BigInteger.ZERO);
@@ -417,6 +430,7 @@ public class LadderService implements ApplicationListener<AccountServiceEvent> {
   boolean buyMulti(Event event, LadderEntity ladder) {
     try {
       RankerEntity ranker = findActiveRankerOfAccountOnLadder(event.getAccountId(), ladder);
+	  if (ranker == null) return false;
       BigInteger cost = upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getMultiplier(), ladder.getTypes());
       if (ranker.getPower().compareTo(cost) >= 0) {
         ranker.setPoints(BigInteger.ZERO);
@@ -482,6 +496,7 @@ public class LadderService implements ApplicationListener<AccountServiceEvent> {
   boolean promote(Event event, LadderEntity ladder) {
     try {
       RankerEntity ranker = findActiveRankerOfAccountOnLadder(event.getAccountId(), ladder);
+	  if (ranker == null) return false;
       if (ladderUtils.canPromote(ladder, ranker)) {
         AccountEntity account = accountService.find(ranker.getAccount());
         log.info("[L{}] Promotion for {} (#{})", ladder.getNumber(), account.getUsername(),
@@ -612,6 +627,7 @@ public class LadderService implements ApplicationListener<AccountServiceEvent> {
     try {
       ladder = find(ladder);
       RankerEntity ranker = findActiveRankerOfAccountOnLadder(event.getAccountId(), ladder);
+	  if (ranker == null) return false;
       RankerEntity target = ladder.getRankers().get(0);
       AccountEntity rankerAccount = accountService.find(ranker.getAccount());
       AccountEntity targetAccount = accountService.find(target.getAccount());
