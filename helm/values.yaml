@@ -1,0 +1,11 @@
+namespace: default
+image:
+  repository: registry.localhost
+  version: latest
+ingress:
+  host: morefair.localhost
+configVolume:
+  hostPath:
+    path: /application.properties
+    type: FileOrCreate
+postgresAddress: localhost

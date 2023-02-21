@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: morefair
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: morefair
+spec:
+  ports:
+    - port: 8080
+      targetPort: morefair
+      name: morefair
+  selector:
+    app: morefair
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: {{ .Values.namespace }}
+spec:
+  type: ExternalName
+  externalName: {{ .Values.postgresAddress }}
+  ports:
+  - port: 5432
