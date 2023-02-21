@@ -3,6 +3,7 @@ package de.kaliburg.morefair.bots;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.kaliburg.morefair.account.AccountEntity;
+import io.hypersistence.utils.hibernate.type.array.DoubleArrayType;
 import java.util.UUID;
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -22,6 +23,7 @@ import lombok.NonNull;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 import org.hibernate.annotations.Type;
+import org.hibernate.annotations.TypeDef;
 
 @Entity
 @Table(name = "bot", uniqueConstraints = @UniqueConstraint(name = "uk_uuid", columnNames = "uuid"))
@@ -30,6 +32,7 @@ import org.hibernate.annotations.Type;
 @Accessors(chain = true)
 @NoArgsConstructor
 @SequenceGenerator(name = "seq_bot", sequenceName = "seq_bot", allocationSize = 1)
+@TypeDef(name = "double[]", typeClass = DoubleArrayType.class)
 public class BotEntity {
 
   @Id
@@ -48,6 +51,14 @@ public class BotEntity {
   
   private BotType type;
   
+  @Type(type = "double[]")
+  @Column(columnDefinition = "double precision[]")
+  private double[] schedule = {};
+  
+  private int currentSchedule = 0;
+  
+  private boolean awake = true;
+  
   @Transient
   private boolean loggedIn = false;
   
@@ -59,10 +70,25 @@ public class BotEntity {
   @Column(nullable = false)
   private String name;
 
-  public BotEntity(UUID uuid, BotType type, String name) {
+  public BotEntity(UUID uuid, BotType type, String name, double[] schedule) {
     this.uuid = uuid;
 	this.type = type;
 	this.name = name;
+	this.schedule = schedule;
   }
   
+  public String getDisplayName() {
+	return name + " " + type.getIcon() + "🤖" + (awake ? "" : " 💤");
+  }
+  
+  public void updateSchedule(double schedulePercent) {
+	if (schedulePercent > schedule[currentSchedule]) {
+      currentSchedule++;
+//	  if (currentSchedule >= schedule.length) currentSchedule = 0;
+	  awake = !awake;
+	}
+	if (currentSchedule > 1 && schedulePercent < schedule[currentSchedule - 1]) {
+		currentSchedule = 0;
+	}
+  }
 }

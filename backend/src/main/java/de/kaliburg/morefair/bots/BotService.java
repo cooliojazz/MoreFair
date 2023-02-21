@@ -3,6 +3,8 @@ package de.kaliburg.morefair.bots;
 import de.kaliburg.morefair.FairConfig;
 import de.kaliburg.morefair.account.AccountDetailsDto;
 import de.kaliburg.morefair.account.AccountService;
+import de.kaliburg.morefair.api.AccountController;
+import de.kaliburg.morefair.api.websockets.messages.WsMessage;
 import de.kaliburg.morefair.api.websockets.messages.WsObservedMessage;
 import java.util.Collections;
 import java.util.HashMap;
@@ -45,6 +47,9 @@ public class BotService {
 	
 	@Value("${fair.bot-connect-max-timeout}")
 	private int CONNECTION_TIMEOUT;
+	
+	@Value("${fair.bot-schedule-length}")
+	private int SCHEDULE_LENGTH;
 	
     @Autowired
 	private FairConfig config;
@@ -135,7 +140,18 @@ public class BotService {
     }
 	
 	private void createBot() {
-		BotEntity bot = new BotEntity(UUID.randomUUID(), BotType.randomType(), nameService.generate());
+		ArrayList<Double> schedule = new ArrayList<>();
+		double total = 0;
+		while (true) {
+			double next = Math.random() / 2;
+			if (total + next > 1) break;
+			total += next;
+//			schedule.add(next);
+			schedule.add(total);
+		}
+//		schedule.add(1 - total);
+		schedule.add(1d);
+		BotEntity bot = new BotEntity(UUID.randomUUID(), BotType.randomType(), nameService.generate(), schedule.stream().mapToDouble(i -> i).toArray());
 		if (bot.getType() == BotType.ZOMBIE) bot.getData().put("waitTime", Math.random() * config.getManualPromoteWaitTime() + config.getManualPromoteWaitTime() / 2);
 		if (bot.getType() == BotType.SLEEPYSPAMMER) {
 			bot.getData().put("awake", true);
@@ -152,35 +168,23 @@ public class BotService {
 	}
 	
 	private void runBot(BotEntity bot, LadderEntity ladder, RankerEntity ranker) {
-		switch (bot.getType()) {
-			case TRUEZOMBIE: {
-				break;
-			}
-			case ZOMBIE: {
-				if (Math.random() < 1 / bot.getData().get("waitTime").asDouble(1) && ladderUtils.canPromote(ladder, ranker)) sendGameEvent(bot, "promote");
-				break;
-			}
-			case AUTOZOMBIE: {
-				if (ladderUtils.canBuyAutoPromote(ladder, ranker, roundService.getCurrentRound())) sendGameEvent(bot, "autopromote");
-				break;
-			}
-			case SPAMMER: {
-				if (ladderUtils.canPromote(ladder, ranker)) {
-					sendGameEvent(bot, "promote");
-				} else if (ranker.getPower().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getMultiplier(), ladder.getTypes())) >= 0) {
-					sendGameEvent(bot, "multi");
-				} else if (ranker.getPoints().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getBias(), ladder.getTypes())) >= 0) {
-					sendGameEvent(bot, "bias");
-				} else if (ladderUtils.canBuyAutoPromote(ladder, ranker, roundService.getCurrentRound())) {
-					sendGameEvent(bot, "autopromote");
-				} else if (ladderUtils.canThrowVinegarAt(ladder, ranker, ladder.getRankers().get(0))) {
-					sendGameEvent(bot, "vinegar");
+		boolean wasAwake = bot.isAwake();
+		bot.updateSchedule((double)(System.currentTimeMillis() % (SCHEDULE_LENGTH * 60000)) / (SCHEDULE_LENGTH * 60000));
+		if (wasAwake != bot.isAwake()) botSessions.get(bot).send(BotService.APP_DESTINATION + AccountController.APP_RENAME_DESTINATION, new WsMessage(bot.getUuid().toString(), bot.getDisplayName()));
+		if (bot.isAwake()) {
+			switch (bot.getType()) {
+				case TRUEZOMBIE: {
+					break;
 				}
-				break;
-			}
-			case SLEEPYSPAMMER: {
-				bot.getData().put("time", bot.getData().get("time").asInt() + 1);
-				if (bot.getData().get("awake").asBoolean(true)) {
+				case ZOMBIE: {
+					if (Math.random() < 1 / bot.getData().get("waitTime").asDouble(1) && ladderUtils.canPromote(ladder, ranker)) sendGameEvent(bot, "promote");
+					break;
+				}
+				case AUTOZOMBIE: {
+					if (ladderUtils.canBuyAutoPromote(ladder, ranker, roundService.getCurrentRound())) sendGameEvent(bot, "autopromote");
+					break;
+				}
+				case SPAMMER: {
 					if (ladderUtils.canPromote(ladder, ranker)) {
 						sendGameEvent(bot, "promote");
 					} else if (ranker.getPower().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getMultiplier(), ladder.getTypes())) >= 0) {
@@ -192,112 +196,129 @@ public class BotService {
 					} else if (ladderUtils.canThrowVinegarAt(ladder, ranker, ladder.getRankers().get(0))) {
 						sendGameEvent(bot, "vinegar");
 					}
-					if (bot.getData().get("time").asInt() > bot.getData().get("wakeTime").asInt()) {
-						bot.getData().put("awake", false);
-						bot.getData().put("time", 0);
-					}
-				} else {
-					if (bot.getData().get("time").asInt() > bot.getData().get("sleepTime").asInt()) {
-						bot.getData().put("awake", true);
-						bot.getData().put("time", 0);
-					}
+					break;
 				}
-				break;
-			}
-			case SUPERSPAMMER: {
-				if (ladderUtils.canPromote(ladder, ranker)) {
-					sendGameEvent(bot, "promote");
-				}
-				if (ranker.getPower().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getMultiplier(), ladder.getTypes())) >= 0) {
-					sendGameEvent(bot, "multi");
-				}
-				if (ranker.getPoints().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getBias(), ladder.getTypes())) >= 0) {
-					sendGameEvent(bot, "bias");
-				}
-				if (ladderUtils.canBuyAutoPromote(ladder, ranker, roundService.getCurrentRound())) {
-					sendGameEvent(bot, "autopromote");
-				}
-				if (ladderUtils.canThrowVinegarAt(ladder, ranker, ladder.getRankers().get(0))) {
-					sendGameEvent(bot, "vinegar");
-				}
-				break;
-			}
-			case RANDOM: {
-				double rate = bot.getData().get("rate").asDouble(0);
-				if (Math.random() < rate) {
-					sendGameEvent(bot, "promote");
-				} else if (Math.random() < rate) {
-					sendGameEvent(bot, "multi");
-				} else if (Math.random() < rate) {
-					sendGameEvent(bot, "bias");
-				} else if (Math.random() < rate) {
-					sendGameEvent(bot, "autopromote");
-				} else if (Math.random() < rate) {
-					sendGameEvent(bot, "vinegar");
-				}
-				break;
-			}
-			case RUNNERUP: {
-				int mult = findHighestMult(ladder);
-				if (ladderUtils.canPromote(ladder, ranker)) {
-					sendGameEvent(bot, "promote");
-				} else if (ranker.getPower().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getMultiplier(), ladder.getTypes())) >= 0 &&
-						ranker.getMultiplier() < mult - 1) {
-					sendGameEvent(bot, "multi");
-				} else if (ranker.getPoints().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getBias(), ladder.getTypes())) >= 0 &&
-						(ranker.getMultiplier() < mult - 2 || ranker.getBias() < findHighestBias(ladder) - 1)) {
-					sendGameEvent(bot, "bias");
-				} else if (ladderUtils.canBuyAutoPromote(ladder, ranker, roundService.getCurrentRound())) {
-					sendGameEvent(bot, "autopromote");
-				} else if (ladderUtils.canThrowVinegarAt(ladder, ranker, ladder.getRankers().get(0)) && ranker.getRank() == 2) {
-					sendGameEvent(bot, "vinegar");
-				}
-				break;
-			}
-			case ANTIFIRST: {
-				if (ladderUtils.canPromote(ladder, ranker)) {
-					sendGameEvent(bot, "promote");
-				} else if (ranker.getPower().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getMultiplier(), ladder.getTypes())) >= 0) {
-					sendGameEvent(bot, "multi");
-				} else if (ranker.getPoints().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getBias(), ladder.getTypes())) >= 0 && ranker.getRank() == 1) {
-					sendGameEvent(bot, "bias");
-				} else if (ladderUtils.canBuyAutoPromote(ladder, ranker, roundService.getCurrentRound())) {
-					sendGameEvent(bot, "autopromote");
-				} else if (ladderUtils.canThrowVinegarAt(ladder, ranker, ladder.getRankers().get(0)) && ranker.getRank() > 2) {
-					sendGameEvent(bot, "vinegar");
-				}
-				break;
-			}
-			case WALL: {
-				if (ranker.getPower().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getMultiplier(), ladder.getTypes())) >= 0) {
-					sendGameEvent(bot, "multi");
-				} else if (ranker.getPoints().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getBias(), ladder.getTypes())) >= 0 && ranker.getRank() == 1) {
-					sendGameEvent(bot, "bias");
-				}
-				break;
-			}
-			case FARMER: {
-				bot.getData().put("lastTime", bot.getData().get("lastTime").asInt() + 1);
-				if (ladderUtils.canPromote(ladder, ranker)) {
-					sendGameEvent(bot, "promote");
-				} else {
-					if (Math.random() > (bot.getData().get("patience").asDouble()- bot.getData().get("lastTime").asInt()) / bot.getData().get("patience").asDouble()) {
-						if (ranker.getPoints().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getBias(), ladder.getTypes())) >= 0 &&
-								ranker.getRank() < ladder.getRankers().size()) {
-							sendGameEvent(bot, "bias");
-							bot.getData().put("lastTime", 0);
-						} else if (ranker.getPower().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getMultiplier(), ladder.getTypes())) >= 0 &&
-								ranker.getRank() < ladder.getRankers().size()) {
+				case SLEEPYSPAMMER: {
+					bot.getData().put("time", bot.getData().get("time").asInt() + 1);
+					if (bot.getData().get("awake").asBoolean(true)) {
+						if (ladderUtils.canPromote(ladder, ranker)) {
+							sendGameEvent(bot, "promote");
+						} else if (ranker.getPower().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getMultiplier(), ladder.getTypes())) >= 0) {
 							sendGameEvent(bot, "multi");
-							bot.getData().put("lastTime", 0);
-//						} else if (ladderUtils.canBuyAutoPromote(ladder, ranker, roundService.getCurrentRound()) && ranker.getRank() == ladder.getRankers().size()) {
-//							sendGameEvent(bot, "autopromote");
-		//				} else if (ladderUtils.canThrowVinegarAt(ladder, ranker, ladder.getRankers().get(0))) {
-		//					sendGameEvent(bot, "vinegar");
+						} else if (ranker.getPoints().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getBias(), ladder.getTypes())) >= 0) {
+							sendGameEvent(bot, "bias");
+						} else if (ladderUtils.canBuyAutoPromote(ladder, ranker, roundService.getCurrentRound())) {
+							sendGameEvent(bot, "autopromote");
+						} else if (ladderUtils.canThrowVinegarAt(ladder, ranker, ladder.getRankers().get(0))) {
+							sendGameEvent(bot, "vinegar");
+						}
+						if (bot.getData().get("time").asInt() > bot.getData().get("wakeTime").asInt()) {
+							bot.getData().put("awake", false);
+							bot.getData().put("time", 0);
+						}
+					} else {
+						if (bot.getData().get("time").asInt() > bot.getData().get("sleepTime").asInt()) {
+							bot.getData().put("awake", true);
+							bot.getData().put("time", 0);
 						}
 					}
+					break;
 				}
-				break;
+				case SUPERSPAMMER: {
+					if (ladderUtils.canPromote(ladder, ranker)) {
+						sendGameEvent(bot, "promote");
+					}
+					if (ranker.getPower().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getMultiplier(), ladder.getTypes())) >= 0) {
+						sendGameEvent(bot, "multi");
+					}
+					if (ranker.getPoints().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getBias(), ladder.getTypes())) >= 0) {
+						sendGameEvent(bot, "bias");
+					}
+					if (ladderUtils.canBuyAutoPromote(ladder, ranker, roundService.getCurrentRound())) {
+						sendGameEvent(bot, "autopromote");
+					}
+					if (ladderUtils.canThrowVinegarAt(ladder, ranker, ladder.getRankers().get(0))) {
+						sendGameEvent(bot, "vinegar");
+					}
+					break;
+				}
+				case RANDOM: {
+					double rate = bot.getData().get("rate").asDouble(0);
+					if (Math.random() < rate) {
+						sendGameEvent(bot, "promote");
+					} else if (Math.random() < rate) {
+						sendGameEvent(bot, "multi");
+					} else if (Math.random() < rate) {
+						sendGameEvent(bot, "bias");
+					} else if (Math.random() < rate) {
+						sendGameEvent(bot, "autopromote");
+					} else if (Math.random() < rate) {
+						sendGameEvent(bot, "vinegar");
+					}
+					break;
+				}
+				case RUNNERUP: {
+					int mult = findHighestMult(ladder);
+					if (ladderUtils.canPromote(ladder, ranker)) {
+						sendGameEvent(bot, "promote");
+					} else if (ranker.getPower().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getMultiplier(), ladder.getTypes())) >= 0 &&
+							ranker.getMultiplier() < mult - 1) {
+						sendGameEvent(bot, "multi");
+					} else if (ranker.getPoints().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getBias(), ladder.getTypes())) >= 0 &&
+							(ranker.getMultiplier() < mult - 2 || ranker.getBias() < findHighestBias(ladder) - 1)) {
+						sendGameEvent(bot, "bias");
+					} else if (ladderUtils.canBuyAutoPromote(ladder, ranker, roundService.getCurrentRound())) {
+						sendGameEvent(bot, "autopromote");
+					} else if (ladderUtils.canThrowVinegarAt(ladder, ranker, ladder.getRankers().get(0)) && ranker.getRank() == 2) {
+						sendGameEvent(bot, "vinegar");
+					}
+					break;
+				}
+				case ANTIFIRST: {
+					if (ladderUtils.canPromote(ladder, ranker)) {
+						sendGameEvent(bot, "promote");
+					} else if (ranker.getPower().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getMultiplier(), ladder.getTypes())) >= 0) {
+						sendGameEvent(bot, "multi");
+					} else if (ranker.getPoints().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getBias(), ladder.getTypes())) >= 0 && ranker.getRank() == 1) {
+						sendGameEvent(bot, "bias");
+					} else if (ladderUtils.canBuyAutoPromote(ladder, ranker, roundService.getCurrentRound())) {
+						sendGameEvent(bot, "autopromote");
+					} else if (ladderUtils.canThrowVinegarAt(ladder, ranker, ladder.getRankers().get(0)) && ranker.getRank() > 2) {
+						sendGameEvent(bot, "vinegar");
+					}
+					break;
+				}
+				case WALL: {
+					if (ranker.getPower().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getMultiplier(), ladder.getTypes())) >= 0) {
+						sendGameEvent(bot, "multi");
+					} else if (ranker.getPoints().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getBias(), ladder.getTypes())) >= 0 && ranker.getRank() == 1) {
+						sendGameEvent(bot, "bias");
+					}
+					break;
+				}
+				case FARMER: {
+					bot.getData().put("lastTime", bot.getData().get("lastTime").asInt() + 1);
+					if (ladderUtils.canPromote(ladder, ranker)) {
+						sendGameEvent(bot, "promote");
+					} else {
+						if (Math.random() > (bot.getData().get("patience").asDouble()- bot.getData().get("lastTime").asInt()) / bot.getData().get("patience").asDouble()) {
+							if (ranker.getPoints().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getBias(), ladder.getTypes())) >= 0 &&
+									ranker.getRank() < ladder.getRankers().size()) {
+								sendGameEvent(bot, "bias");
+								bot.getData().put("lastTime", 0);
+							} else if (ranker.getPower().compareTo(upgradeUtils.buyUpgradeCost(ladder.getNumber(), ranker.getMultiplier(), ladder.getTypes())) >= 0 &&
+									ranker.getRank() < ladder.getRankers().size()) {
+								sendGameEvent(bot, "multi");
+								bot.getData().put("lastTime", 0);
+	//						} else if (ladderUtils.canBuyAutoPromote(ladder, ranker, roundService.getCurrentRound()) && ranker.getRank() == ladder.getRankers().size()) {
+	//							sendGameEvent(bot, "autopromote");
+			//				} else if (ladderUtils.canThrowVinegarAt(ladder, ranker, ladder.getRankers().get(0))) {
+			//					sendGameEvent(bot, "vinegar");
+							}
+						}
+					}
+					break;
+				}
 			}
 		}
 	}

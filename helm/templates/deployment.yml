@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: morefair
-  namespace: morefair
+  namespace: {{ .Values.namespace }}
   labels:
     app: morefair
 spec:
@@ -16,12 +16,8 @@ spec:
         app: morefair
     spec:
       volumes:
-      - name: morefair-config
-        hostPath:
-          path: /mount/config/morefair/application.properties
-          type: FileOrCreate
-      imagePullSecrets:
-      - name: morefair
+        - name: morefair-config
+{{ toYaml .Values.configVolume | indent 10 }}
       containers:
       - name: morefair
         image: "{{ .Values.image.repository }}/morefair:{{ .Values.image.version }}"

@@ -160,7 +160,7 @@
 	  <groupId>io.hypersistence</groupId>
 	  <artifactId>hypersistence-utils-hibernate-55</artifactId>
 	  <version>3.1.1</version>
-	</dependency>
+    </dependency>
     <!-- WebJars -->
     <dependency>
       <artifactId>webjars-locator</artifactId>

@@ -67,10 +67,9 @@ public class BotSessionHandler implements StompSessionHandler {
 			System.out.println("Uhhhhh how???");
 		}
 		synchronized (session) {
-
 			if (headers.getDestination().equals(BotService.USER_DESTINATION + AccountController.QUEUE_LOGIN_DESTINATION)) {
 				botService.loginBot(bot, ((WsWrapper.AccountDetailsDto)payload).getContent());
-				session.send(BotService.APP_DESTINATION + AccountController.APP_RENAME_DESTINATION, new WsMessage(bot.getUuid().toString(), bot.getName() + " " + bot.getType().getIcon() + "🤖"));
+				session.send(BotService.APP_DESTINATION + AccountController.APP_RENAME_DESTINATION, new WsMessage(bot.getUuid().toString(), bot.getDisplayName()));
 				session.subscribe(subscribeHeaders(BotService.USER_DESTINATION + FairController.QUEUE_INFO_DESTINATION), this);
 				session.send(BotService.APP_DESTINATION + FairController.APP_INFO_DESTINATION, new WsEmptyMessage(bot.getUuid().toString()));
 			}

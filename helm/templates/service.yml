@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: morefair
-  namespace: morefair
+  namespace: {{ .Values.namespace }}
   labels:
     app: morefair
 spec:
@@ -17,9 +17,9 @@ apiVersion: v1
 kind: Service
 metadata:
   name: postgres
-  namespace: morefair
+  namespace: {{ .Values.namespace }}
 spec:
   type: ExternalName
-  externalName: postgres.postgres.svc.cluster.local
+  externalName: {{ .Values.postgresAddress }}
   ports:
   - port: 5432

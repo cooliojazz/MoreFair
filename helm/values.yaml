@@ -1,5 +1,11 @@
+namespace: default
 image:
-  repository: registry.unphan.co
+  repository: registry.localhost
   version: latest
 ingress:
-  host: morefair.unphan.co
+  host: morefair.localhost
+configVolume:
+  hostPath:
+    path: /application.properties
+    type: FileOrCreate
+postgresAddress: localhost

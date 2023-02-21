@@ -1,0 +1,11 @@
+namespace: morefair
+image:
+  repository: registry.unphan.co
+  version: latest
+ingress:
+  host: morefair.unphan.co
+configVolume:
+  hostPath:
+    path: /mount/config/morefair/application.properties
+    type: FileOrCreate
+postgresAddress: postgres.postgres.svc.cluster.local
